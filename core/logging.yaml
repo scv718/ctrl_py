@@ -1,0 +1,37 @@
+version: 1
+handlers:
+  stream_handler:
+    class: logging.StreamHandler
+    formatter: default_formatter
+    stream: ext://sys.stdout
+  api_handler:
+    class: logging.handlers.TimedRotatingFileHandler
+    formatter: default_formatter
+    filename: ./api.log
+    backupCount: 5
+    when: H
+    encoding: utf-8
+  camReg_handler:
+    class: logging.handlers.TimedRotatingFileHandler
+    formatter: default_formatter
+    filename: ./camReg.log
+    backupCount: 5
+    when: H
+    encoding: utf-8
+formatters:
+  default_formatter:
+    format: '[%(asctime)s] [%(threadName)s] [%(levelname)s] %(message)s'
+loggers:
+  root:
+    level: DEBUG
+    handlers: []
+  api:
+    level: DEBUG
+    handlers:
+      - stream_handler
+      - api_handler
+  camReg:
+    level: INFO
+    handlers:
+      - stream_handler
+      - camReg_handler
