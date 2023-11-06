@@ -3,6 +3,7 @@ import os
 
 load_dotenv('config/config.env')
 
+
 dbName = os.getenv("dbName")
 dbPassWord = os.getenv("dbPassWord")
 dbIp = os.getenv("dbIp")

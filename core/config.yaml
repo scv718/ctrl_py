@@ -1,0 +1,22 @@
+dbName: postgres
+dbPassWord: '0000'
+dbIp: localhost
+dbPort: 5432
+dbSchema: test
+pool_size: 5
+max_overflow: 10
+autocommit: false
+autoflush: false
+
+HTTPX_MAX_CONNECTIONS: 10
+HTTPX_MAX_KEEPALIVE: 1048576
+HTTPX_DEBUG: true
+HTTPX_HOST: localhost
+HTTPX_PORT: 127.0.0.1
+HTTPX_TIMEOUT: 10
+
+REST_MAX_CONNECTIONS: 10
+REST_BODY_LIMIT: 1048576
+REST_DEBUG: true
+REST_HOST: localhost
+REST_PORT: 8443
