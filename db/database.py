@@ -4,8 +4,9 @@ from sqlalchemy.orm import sessionmaker
 # import configparser
 import os
 from dotenv import load_dotenv
+import core.log
 
-load_dotenv('config/config.env')
+load_dotenv('core/config.env')
 
 print("database.py is being imported")
 

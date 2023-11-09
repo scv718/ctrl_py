@@ -9,7 +9,7 @@ import core.log as common
 ## engine을 사용함으로 ORM을 사용하는것이 아닌 SQL 자체를 건드리는 방식을 사용하는 것으로 성능 이슈가 없다고 나옴
 ## with 과 같이 사용하면 sqlalchmy에서 conn 변수가 사용이 끝나면 자동으로 닫아줌. 컨텍스트 관리 및 자원해제를 자동으로 관리해줌
 
-log = common.logging.getLogger("api")
+# log = common.logging.getLogger("api")
 
 
 # def insertDB(engine, table, data):
@@ -69,16 +69,16 @@ def insertDB(engine, table, data):
         try:
             result = conn.execute(text(sql), user_dict)
             # 쿼리문
-            log.debug(sql)
+            # log.debug(sql)
             # MAP
-            log.debug(user_dict)
+            # log.debug(user_dict)
             trans.commit()
-            return {"res_code": 200}
+            return {"res_code": 200, "msg" : "DB INSERT SUCCESS"}
         except Exception as e:
             trans.rollback()
             print(e)
             print("Insert DB Fail")
-            return {"error": "Insert failed"}
+            return {"res_code": 400, "msg" : "DB INSERT FAIL"}
 
 
 def selectAllDB(engine, table):
@@ -104,16 +104,21 @@ def selectAllDB(engine, table):
 def selectUserCodeDB(engine, table, user_code):
     table_name = table.__tablename__
 
+    print(user_code)
     if table_name.isupper():
         sql = text(f'select * from "{table_name}" where "USER_CODE" = :user_code')
     else:
         sql = text(f'select * from {table_name} where "USER_CODE" = :user_code')
 
+    print(sql)
+    params = {"user_code" : user_code}
     try:
         with engine.connect() as conn:
-            result = conn.execute(sql, user_code=user_code)
-            data = [dict(row) for row in result.fetchall()]
-        return JSONResponse(content=data)
+            result = conn.execute(sql, params)
+            # print(result)
+            # data = [dict(row) for row in result.fetchall()]
+        # return JSONResponse(content=data)
+        return result.fetchall()
     except Exception as e:
         print("Select DB Fail", e)
         return {"error": "Selection failed"}

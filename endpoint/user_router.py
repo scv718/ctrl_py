@@ -24,22 +24,50 @@ def get_db():
 def create_user(user_cam: schemas.UserCamCreate):
     user = user_cam.user
     cam = user_cam.cam
+
+    data_to_send = {
+        "user_id": user.USER_ID,
+        "cam_id": cam.CAM_ID
+    }
+
+    json_data = json.dumps(data_to_send)
+
+    user_table = models.Giga_user
+    cam_table = models.Giga_cam
+
+    user_code = user.USER_CODE
+    user_select_result = user_crud.selectUserCodeDB(engine, table=user_table, user_code=user_code)
+    print("user_select " + str(user_select_result))
+
+    # if user_select_result is not None:
+    #     print("user_select_result is not None")
+    #     return {"res_code": "400"}
+
     with create_httpx_client() as client:
-        response = client.post('http://localhost:18080/VMS_TEST/session')
+
+        print("java session 호출")
+
+        response = client.post('http://localhost:18080/VMS_TEST/session', data=json_data,
+                               headers={'Content-Type': 'application/json'})
+
+        print(response)
         response_content = response.content.decode("utf-8")
         response_data = json.loads(response_content)
         res_code = response_data.get("res_code")
 
+        print("res_code " + str(res_code))
+
+        print("session 호출 끝")
         if res_code != 200:
             return {"res_code": "400"}
-        user_table = models.Giga_user
-        user_result = user_crud.insertDB(engine, table=user_table, data=user)
-        if user_result is None:
+
+        user_create_result = user_crud.insertDB(engine, table=user_table, data=user)
+        print(user_create_result)
+        if user_create_result.get("res_code") != 200:
             return {"res_code": 400, "msg": "user Insert fail"}
 
-        cam_table = models.Giga_cam
-        cam_result = cam_result = user_crud.insertDB(engine, table=cam_table, data=cam)
-        if cam_result is None:
+        cam_create_result = cam_result = user_crud.insertDB(engine, table=cam_table, data=cam)
+        if cam_create_result.get("res_code") != 200:
             return {"res_code": 400, "msg": "cam Insert fail"}
 
     return {"res_code": 200}
