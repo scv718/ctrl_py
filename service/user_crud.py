@@ -39,6 +39,25 @@ import core.log as common
 #             print("Insert DB Fail")
 #             return {"error": "Insert failed"}
 
+def selectAllDB(engine, table):
+    table_name = table.__tablename__
+
+    if table_name.isupper():
+        sql = f'select * from "{table_name}"'
+    else:
+        sql = f'select * from {table_name}'
+
+    print(sql)
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text(sql))
+            data = [dict(row) for row in result.fetchall()]
+        return JSONResponse(content=data)
+
+    except Exception as e:
+        print("Select DB Fail", e)
+        return {"error": "Selection failed"}
+
 
 def insertDB(engine, table, data):
     user_dict = data.dict()

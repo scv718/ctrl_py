@@ -44,6 +44,7 @@ def test_camera(camera):
         print(cap.get(cv2.CAP_PROP_BITRATE))
         print(cap.get(cv2.CAP_PROP_XI_COOLING))
         print(cap.get(cv2.CAP_PROP_FPS))
+        print(cap)
         if cap.isOpened():
             print(f"RTSP Streaming from {camera['name']} - Success")
 
