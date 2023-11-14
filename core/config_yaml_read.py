@@ -1,6 +1,10 @@
 import yaml
+import os
 
 # YAML 파일을 읽어옴
+
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
 with open('config.yaml', 'r') as yaml_file:
     config = yaml.load(yaml_file, Loader=yaml.FullLoader)
 
@@ -17,13 +21,13 @@ autoflush = config.get("autoflush")
 
 max_connections = config.get("REST_MAX_CONNECTIONS")
 max_request_size = config.get("REST_BODY_LIMIT")
-debug = config.get("REST_DEBUG").lower() == "true"
+debug = config.get("REST_DEBUG") == True
 host = config.get("REST_HOST")
 port = config.get("REST_PORT")
 
 httpx_max_connections = config.get('HTTPX_MAX_CONNECTIONS', 10)
 httpx_max_keepalive = config.get('HTTPX_MAX_KEEPALIVE', 100)  # Suitable default value
-httpx_debug = config.get('HTTPX_DEBUG', 'True').lower() in ['true', '1']
+httpx_debug = config.get('HTTPX_DEBUG', 'True') in [True, '1']
 httpx_timeout = config.get('HTTPX_TIMEOUT', 10.0)
 
 # 설정 값을 딕셔너리로 구성

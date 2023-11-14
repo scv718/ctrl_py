@@ -9,7 +9,7 @@ import core.log as common
 ## engine을 사용함으로 ORM을 사용하는것이 아닌 SQL 자체를 건드리는 방식을 사용하는 것으로 성능 이슈가 없다고 나옴
 ## with 과 같이 사용하면 sqlalchmy에서 conn 변수가 사용이 끝나면 자동으로 닫아줌. 컨텍스트 관리 및 자원해제를 자동으로 관리해줌
 
-# log = common.logging.getLogger("api")
+log = common.logging.getLogger("api")
 
 
 # def insertDB(engine, table, data):
@@ -39,28 +39,11 @@ import core.log as common
 #             print("Insert DB Fail")
 #             return {"error": "Insert failed"}
 
-def selectAllDB(engine, table):
-    table_name = table.__tablename__
+def insert_vms_user_cam_info(engine, table, data):
+    user_dict = data
+    if not isinstance(data, dict):
+        user_dict = data.dict()
 
-    if table_name.isupper():
-        sql = f'select * from "{table_name}"'
-    else:
-        sql = f'select * from {table_name}'
-
-    print(sql)
-    try:
-        with engine.connect() as conn:
-            result = conn.execute(text(sql))
-            data = [dict(row) for row in result.fetchall()]
-        return JSONResponse(content=data)
-
-    except Exception as e:
-        print("Select DB Fail", e)
-        return {"error": "Selection failed"}
-
-
-def insertDB(engine, table, data):
-    user_dict = data.dict()
     table_name = table.__tablename__
 
     keys = user_dict.keys()
@@ -99,6 +82,48 @@ def insertDB(engine, table, data):
             print("Insert DB Fail")
             return {"res_code": 400, "msg" : "DB INSERT FAIL"}
 
+def insertDB(conn, table, data):
+    user_dict = data
+    if not isinstance(data, dict):
+        user_dict = data.dict()
+
+    table_name = table.__tablename__
+
+    keys = user_dict.keys()
+    column_names = ",".join([f'"{col}"' for col in keys])
+    placeholders = ",".join([f':{col}' for col in keys])
+    print(keys)
+
+    # sql = "SELECT * FROM users WHERE username = %s AND password = %s"
+    # conn.execute(sql, ('john', 'pass123'))
+
+    # sql = f'INSERT INTO {table_name} (CAM_CODE, MODEL_CODE, CAM_ID, CONN_TYPE) VALUES (:CAM_CODE, :MODEL_CODE, :CAM_ID, :CONN_TYPE)'
+    # result = conn.execute(text(sql), CAM_CODE=333, MODEL_CODE=1, CAM_ID='33', CONN_TYPE='N')
+
+    # [2023-11-01 16:23:26,140] [AnyIO worker thread] [DEBUG] INSERT INTO "VMS_CAM_INFO" ("CAM_CODE","MODEL_CODE","CAM_ID","CONN_TYPE")
+    #                                                         VALUES (:CAM_CODE,:MODEL_CODE,:CAM_ID,:CONN_TYPE)
+    # [2023-11-01 16:23:26,140] [AnyIO worker thread] [DEBUG] {'CAM_CODE': 33113, 'MODEL_CODE': 1, 'CAM_ID': '3113', 'CONN_TYPE': 'N'}
+
+    if table_name.isupper():
+        sql = f'INSERT INTO "{table_name}" ({column_names}) VALUES ({placeholders})'
+    else:
+        sql = f'INSERT INTO {table_name} ({column_names}) VALUES ({placeholders})'
+
+
+    try:
+
+        result = conn.execute(text(sql), user_dict)
+        # 쿼리문
+        # log.debug(sql)
+        # MAP
+        # log.debug(user_dict)
+        log.info("insert result : %s", result)
+        return {"res_code": 200, "msg" : "DB INSERT SUCCESS"}
+    except Exception as e:
+        print(e)
+        log.info("Insert DB Fail")
+        return {"res_code": 400, "msg" : "DB INSERT FAIL"}
+
 
 def selectAllDB(engine, table):
     table_name = table.__tablename__
@@ -112,15 +137,17 @@ def selectAllDB(engine, table):
     try:
         with engine.connect() as conn:
             result = conn.execute(text(sql))
-            data = [dict(row) for row in result.fetchall()]
-        return JSONResponse(content=data)
+            columns = result.keys()
+            data = [dict(zip(columns, row)) for row in result.fetchall()]
+            print("data : ", data)
+        return data
 
     except Exception as e:
         print("Select DB Fail", e)
         return {"error": "Selection failed"}
 
 
-def selectUserCodeDB(engine, table, user_code):
+def selectUserCodeDB(conn, table, user_code):
     table_name = table.__tablename__
 
     print(user_code)
@@ -132,8 +159,7 @@ def selectUserCodeDB(engine, table, user_code):
     print(sql)
     params = {"user_code" : user_code}
     try:
-        with engine.connect() as conn:
-            result = conn.execute(sql, params)
+        result = conn.execute(sql, params)
             # print(result)
             # data = [dict(row) for row in result.fetchall()]
         # return JSONResponse(content=data)
@@ -146,22 +172,33 @@ def selectUserCodeDB(engine, table, user_code):
 def selectJson(engine, table, json_data):
     table_name = table.__tablename__
 
+    print(json_data)
+
     json_col = [col for col in json_data.keys()]
 
-    where_clause = " AND ".join([f'"{col}" = :{col}' for col in json_col])
+    where_clause = " AND ".join([f'"{col}" =:{col}' for col in json_col])
 
+    print(where_clause)
     if table_name.isupper():
-        sql = text(f'select * from "{table_name}" where {where_clause}')
+        # sql = f'select * from "{table_name}" where {where_clause}'
+        sql = f'select * from "{table_name}" where {where_clause}'
     else:
-        sql = text(f'select * from {table_name} where {where_clause}')
+        sql = f'select * from {table_name} where {where_clause}'
+
+    # sql = f'select * from "{table_name}" where "USER_ID" = :USER_ID AND "USER_CODE" = :USER_CODE'
 
     try:
         with engine.connect() as conn:
-            result = conn.execute(sql, json_data)
-            data = [dict(row) for row in result.fetchall()]
+            print(sql)
+            result = conn.execute(text(sql), json_data)
+            # data = [dict(row) for row in result.fetchall()]
+            columns = result.keys()
 
-            print(data)
-        return JSONResponse(content=data)
+            # Fetch all rows as a list of dictionaries
+            data = [dict(zip(columns, row)) for row in result.fetchall()]
+
+            print("data:", data)
+        return data
     except Exception as e:
         print("Select DB Fail", e)
         return {"error": "Selection failed"}

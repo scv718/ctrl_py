@@ -58,6 +58,13 @@ class CamCreate(CamBase):
     CAM_ID: str
     CONN_TYPE: str
 
+# class UserCamCreate(BaseModel):
+#     USER_CODE: str
+#     USER_ID: str
+#     CAM_CODE: int
+#     CAM_ID: str
+#     MODEL_CODE: int
+#     CONN_TYPE: str
 
 class UserCamCreate(BaseModel):
     user: UserCreate
@@ -66,3 +73,11 @@ class UserCamCreate(BaseModel):
 
 class CamUpdate(CamBase):
     CAM_CODE: int
+
+
+class WowzaBase(BaseModel):
+    WOWZA_INDEX: str
+
+
+class UserCamBase(BaseModel):
+    USER_CAM_CODE: int

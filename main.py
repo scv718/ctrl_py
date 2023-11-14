@@ -4,17 +4,20 @@ import os
 import uvicorn
 from dotenv import load_dotenv
 from endpoint.user_router import user_router
+import core.config_yaml_read as config
+import service.schedules
 
 load_dotenv('core/config.env')
 
 # 기본 FastAPI 애플리케이션
 app = FastAPI()
 
-app.max_connections = int(os.getenv("REST_MAX_CONNECTIONS"))
-app.max_request_size = int(os.getenv("REST_BODY_LIMIT"))
-app.debug = os.getenv("REST_DEBUG").lower() == "true"
-app.host = os.getenv("REST_HOST")
-app.port = int(os.getenv("REST_PORT"))
+app.max_connections = str(config.REST_CONFIG["max_connections"])
+app.max_request_size = int(config.REST_CONFIG["max_request_size"])
+app.debug = str(config.REST_CONFIG["debug"])
+app.host = str(config.REST_CONFIG["host"])
+app.port = int(config.REST_CONFIG["port"])
+
 
 # FastAPI 애플리케이션 설정
 if __name__ == "__main__":
