@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 import os
 
-load_dotenv('config/config.env')
+load_dotenv('config/config_old.env')
 
 
 dbName = os.getenv("dbName")

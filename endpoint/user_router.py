@@ -1,12 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy.orm import Session
-import service.user_crud as user_crud
-import db.gigaeyes_schema as schemas
-import db.gigaeyes_models as models
-import service.camera as camera
-from db.database import SessionLocal, engine
-from core.rest_httpx import create_httpx_client
 import json
+
+from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
+import asyncio
+from sqlalchemy.orm import Session
+import time
+import db.gigaeyes_models as models
+import db.gigaeyes_schema as schemas
+import service.camera as camera
+import service.user_crud as user_crud
+from core.rest_httpx import create_httpx_client, send_data
+from core.async_httpx import async_send
+from db.database import SessionLocal, engine
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -21,10 +25,117 @@ def get_db():
         db.close()
 
 
+@user_router.post("/test/normal", response_model=dict)
+async def test_(request: Request):
+    try:
+        json_data = await request.json()
+        url = 'http://localhost:18080/VMS_TEST/session'
+        data = send_data(url, json_data)
+        print(data)
+
+    except Exception as e:
+        print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+    return {"res_code": 200}
+
+
+async def sleep_task(json_data):
+    await asyncio.sleep(10)
+    url = 'http://localhost:18080/VMS_TEST/session'
+    data = send_data(url, json_data)
+    print("first ", data)
+    return {"message": "10 seconds"}
+
+
+async def sleep_task2(json_data):
+    await asyncio.sleep(3)
+    url = 'http://localhost:18080/VMS_TEST/session'
+    data = send_data(url, json_data)
+    print("seconds ", data)
+    return {"message": "3 seconds"}
+
+
+def background_task(result):
+    print(f"Background task result: {result}")
+
+def background_task_1(result):
+    time.sleep(5)
+    print(f"Background task1 result: {result}")
+
+def background_task_2(result):
+    time.sleep(1)
+    print(f"Background task2 result: {result}")
+
+
+@user_router.post("/test/test", response_model=dict)
+async def test_(request: Request, background_tasks: BackgroundTasks):
+    try:
+        print("start")
+        json_data = await request.json()
+
+        # case 1
+        # third > first > seconds
+        # background_tasks.add_task(sleep_task, json_data)
+        # print("keep going?")
+        # background_tasks.add_task(sleep_task2, json_data)
+        # url = 'http://localhost:18080/VMS_TEST/session'
+        # data = send_data(url, json_data)
+
+        # case 2
+        # seconds > first > third
+        # results = await asyncio.gather(
+        #     sleep_task(json_data),
+        #     sleep_task2(json_data),
+        # )
+        # background_tasks.add_task(background_task, results[0])
+        # background_tasks.add_task(background_task, results[1])
+        # url = 'http://localhost:18080/VMS_TEST/session'
+        # data = send_data(url, json_data)
+
+        # case 3
+        # third > seconds > first
+        task1 = asyncio.create_task(sleep_task(json_data))
+        task2 = asyncio.create_task(sleep_task2(json_data))
+        task1.add_done_callback(lambda t: background_task_1(t.result()))
+        task2.add_done_callback(lambda t: background_task_2(t.result()))
+        url = 'http://localhost:18080/VMS_TEST/session'
+        data = send_data(url, json_data)
+        print("third ", data)
+        print("end")
+
+    except Exception as e:
+        print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+    return {"res_code": 200}
+
+
+@user_router.post("/Vtest", response_model=dict)
+async def report(request: Request):
+    try:
+        json_data = await request.json()
+        key = json_data["key"]
+        if key == "cam_status_report":
+            print(key)
+
+        else:
+            print("key")
+            url = 'http://localhost:18080/VMS_TEST/session'
+            send_data(url, json_data)
+            return {"res_code": 200}
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Internal Server Error")
+
+
 @user_router.post("/V100/VMS_10005/live_video_stream_urls", response_model=dict)
 async def select_vms_user(request: Request):
     json_data = await request.json()
     print(json_data)
+
     # table = models.GigaUser()
     # select_user_data = user_crud.selectJson(engine, table, json_data)
     #
@@ -81,8 +192,12 @@ def create_user(user_cam: schemas.UserCamCreate, db: Session = Depends(get_db)):
         with engine.connect() as conn:
             trans = conn.begin()
             user_code = user.USER_CODE
-            user_select_result = user_crud.selectUserCodeDB(conn, table=user_table, user_code=user_code)
-            print("user_select " + str(user_select_result))
+            cam_code = cam.CAM_CODE
+            user_select_result = user_crud.selectUserCodeDB(conn, table=user_cam_table, user_code=user_code,
+                                                            cam_code=cam_code)
+            # if user_select_result:
+            #     print("user_select_result : ", user_select_result)
+            #     return {"res_code": 991}
 
             # if user_select_result is not None:
             #     print("user_select_result is not None")
@@ -92,7 +207,7 @@ def create_user(user_cam: schemas.UserCamCreate, db: Session = Depends(get_db)):
 
                 print("java session 호출")
 
-                response = client.post('http://localhost:18080/VMS_TEST/session', data=json_data,
+                response = client.post('http://192.168.1.79:9090/test1', data=json_data,
                                        headers={'Content-Type': 'application/json'})
 
                 print(response)
@@ -106,12 +221,12 @@ def create_user(user_cam: schemas.UserCamCreate, db: Session = Depends(get_db)):
                 if res_code != 200:
                     return {"res_code": "400"}
 
-                user_create_result = user_crud.insertDB(conn, table=user_table, data=user)
+                user_create_result = user_crud.insert_user_cam_info(conn, table=user_table, data=user)
                 print("user_create_result : " + str(user_create_result.get("res_code")))
                 if user_create_result.get("res_code") != 200:
                     raise HTTPException(status_code=400, detail="User insert failed")
 
-                cam_create_result = user_crud.insertDB(conn, table=cam_table, data=cam)
+                cam_create_result = user_crud.insert_user_cam_info(conn, table=cam_table, data=cam)
                 print("cam_create_result : " + str(cam_create_result.get("res_code")))
                 if cam_create_result.get("res_code") != 200:
                     raise HTTPException(status_code=400, detail="Cam insert failed")
@@ -119,10 +234,11 @@ def create_user(user_cam: schemas.UserCamCreate, db: Session = Depends(get_db)):
                 user_cam_dict = {
                     "USER_CODE": user.USER_CODE,
                     "CAM_CODE": cam.CAM_CODE,
-                    "USER_CAM_CODE": user.USER_CODE + str(cam.CAM_CODE)
+                    "USER_CAM_CODE": user.USER_CODE + str(cam.CAM_CODE),
+                    "WOWZA_INDEX": 1
                 }
 
-                user_cam_create_result = user_crud.insertDB(conn, table=user_cam_table, data=user_cam_dict)
+                user_cam_create_result = user_crud.insert_user_cam_info(conn, table=user_cam_table, data=user_cam_dict)
                 print("user_cam_insert : " + str(user_cam_create_result.get("res_code")))
                 if user_cam_create_result.get("res_code") != 200:
                     raise HTTPException(status_code=400, detail="UserCam insert failed")
@@ -134,7 +250,6 @@ def create_user(user_cam: schemas.UserCamCreate, db: Session = Depends(get_db)):
     except Exception as e:
         # 모든 다른 예외에 대한 처리
         print(f"Error during transaction: {e}")
-        trans.rollback()
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
     finally:
@@ -232,7 +347,7 @@ def update_user(user: schemas.UserUpdate, db: Session = Depends(get_db)):
 def create_vsm_user(data: schemas.UserCreate):
     table = models.GigaUser()
 
-    return user_crud.insertDB(engine, table, data)
+    return user_crud.insert(engine, table, data)
 
 
 @user_router.get("/users/giga/select", response_model=schemas.User)

@@ -9,7 +9,7 @@ import core.config_yaml_read as config
 
 print("database.py is being imported")
 
-# load_dotenv('core/config.env')
+# load_dotenv('core/config_old.env')
 
 # dbName = os.getenv("dbName")
 # dbPassWord = os.getenv("dbPassWord")

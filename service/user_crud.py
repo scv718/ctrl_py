@@ -12,6 +12,8 @@ import core.log as common
 log = common.logging.getLogger("api")
 
 
+
+
 # def insertDB(engine, table, data):
 #     user_dict = data.dict()
 #     table_name = table.__tablename__
@@ -39,7 +41,7 @@ log = common.logging.getLogger("api")
 #             print("Insert DB Fail")
 #             return {"error": "Insert failed"}
 
-def insert_vms_user_cam_info(engine, table, data):
+def insert(engine, table, data):
     user_dict = data
     if not isinstance(data, dict):
         user_dict = data.dict()
@@ -75,14 +77,15 @@ def insert_vms_user_cam_info(engine, table, data):
             # MAP
             # log.debug(user_dict)
             trans.commit()
-            return {"res_code": 200, "msg" : "DB INSERT SUCCESS"}
+            return {"res_code": 200, "msg": "DB INSERT SUCCESS"}
         except Exception as e:
             trans.rollback()
             print(e)
             print("Insert DB Fail")
-            return {"res_code": 400, "msg" : "DB INSERT FAIL"}
+            return {"res_code": 400, "msg": "DB INSERT FAIL"}
 
-def insertDB(conn, table, data):
+
+def insert_user_cam_info(conn, table, data):
     user_dict = data
     if not isinstance(data, dict):
         user_dict = data.dict()
@@ -109,7 +112,6 @@ def insertDB(conn, table, data):
     else:
         sql = f'INSERT INTO {table_name} ({column_names}) VALUES ({placeholders})'
 
-
     try:
 
         result = conn.execute(text(sql), user_dict)
@@ -118,11 +120,11 @@ def insertDB(conn, table, data):
         # MAP
         # log.debug(user_dict)
         log.info("insert result : %s", result)
-        return {"res_code": 200, "msg" : "DB INSERT SUCCESS"}
+        return {"res_code": 200, "msg": "DB INSERT SUCCESS"}
     except Exception as e:
         print(e)
         log.info("Insert DB Fail")
-        return {"res_code": 400, "msg" : "DB INSERT FAIL"}
+        return {"res_code": 400, "msg": "DB INSERT FAIL"}
 
 
 def selectAllDB(engine, table):
@@ -147,23 +149,26 @@ def selectAllDB(engine, table):
         return {"error": "Selection failed"}
 
 
-def selectUserCodeDB(conn, table, user_code):
+def selectUserCodeDB(conn, table, user_code, cam_code):
     table_name = table.__tablename__
 
     print(user_code)
     if table_name.isupper():
-        sql = text(f'select * from "{table_name}" where "USER_CODE" = :user_code')
+        sql = text(f'select * from "{table_name}" where "USER_CODE" = :user_code and "CAM_CODE" = :cam_code')
     else:
-        sql = text(f'select * from {table_name} where "USER_CODE" = :user_code')
+        sql = text(f'select * from {table_name} where "USER_CODE" = :user_code and "CAM_CODE" = :cam_code')
 
     print(sql)
-    params = {"user_code" : user_code}
+    params = {"user_code": user_code, "cam_code": cam_code}
     try:
         result = conn.execute(sql, params)
-            # print(result)
-            # data = [dict(row) for row in result.fetchall()]
-        # return JSONResponse(content=data)
-        return result.fetchall()
+        # data = [dict(row) for row in result.fetchall()]
+        columns = result.keys()
+
+        # Fetch all rows as a list of dictionaries
+        data = [dict(zip(columns, row)) for row in result.fetchall()]
+        print(data)
+        return data
     except Exception as e:
         print("Select DB Fail", e)
         return {"error": "Selection failed"}
@@ -318,5 +323,3 @@ def deleteUserCodeDB(engine, table, data):
 #         db.commit()
 #         db.refresh(existing_user)
 #     return existing_user
-
-

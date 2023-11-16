@@ -13,9 +13,6 @@ class User(UserBase):
     REG_DATETIME: datetime
     MOD_DATETIME: datetime
 
-    class Config:
-        orm_mode = True
-
 
 class UserCreate(UserBase):
     USER_ID: str
@@ -49,14 +46,12 @@ class Cam(CamBase):
     SAVE_METHOD: str
     CONN_TYPE: str
 
-    class Config:
-        orm_mode = True
-
 
 class CamCreate(CamBase):
     MODEL_CODE: int
     CAM_ID: str
     CONN_TYPE: str
+
 
 # class UserCamCreate(BaseModel):
 #     USER_CODE: str

@@ -1,10 +1,11 @@
 import os
 import httpx
 import core.config_yaml_read as config
+import json
 
 # from dotenv import load_dotenv
 #
-# load_dotenv('config.env')
+# load_dotenv('config_old.env')
 #
 # max_connections = int(os.getenv('HTTPX_MAX_CONNECTIONS', default=10))
 # max_keepalive = int(os.getenv('HTTPX_MAX_KEEPALIVE', default=100))  # Use a suitable default value
@@ -17,6 +18,7 @@ max_keepalive = HTTPX_CLIENT_CONFIG["max_request_size"]
 debug = HTTPX_CLIENT_CONFIG["debug"]
 timeout = HTTPX_CLIENT_CONFIG["timeout"]
 
+
 def create_httpx_client():
     limits = httpx.Limits(max_keepalive_connections=5, max_connections=10)
     return httpx.Client(
@@ -24,3 +26,21 @@ def create_httpx_client():
         http2=debug,
         timeout=timeout
     )
+
+
+def send_data(url, json_data):
+    with create_httpx_client() as client:
+        print(url, " 호츨")
+        response = client.post(
+            url, json=json_data, headers={'Content-Type': 'application/json'}
+        )
+
+        response_content = response.content.decode("utf-8")
+        response_data = json.loads(response_content)
+        res_code = response_data.get("res_code")
+
+        print("res_code " + str(res_code))
+
+        print(url, " 호출 끝")
+
+        return res_code
