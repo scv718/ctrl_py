@@ -1,5 +1,5 @@
 import json
-
+import requests
 from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
 import asyncio
 from sqlalchemy.orm import Session
@@ -11,6 +11,7 @@ import service.user_crud as user_crud
 from core.rest_httpx import create_httpx_client, send_data
 from core.async_httpx import async_send
 from db.database import SessionLocal, engine
+import service.xml_read as xml
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -60,9 +61,11 @@ async def sleep_task2(json_data):
 def background_task(result):
     print(f"Background task result: {result}")
 
+
 def background_task_1(result):
     time.sleep(5)
     print(f"Background task1 result: {result}")
+
 
 def background_task_2(result):
     time.sleep(1)
@@ -177,73 +180,190 @@ def create_user(user_cam: schemas.UserCamCreate, db: Session = Depends(get_db)):
         print(user_cam)
         user = user_cam.user
         cam = user_cam.cam
+        usercamcode = user.USER_CODE + "_" + str(cam.CAM_CODE)
 
         data_to_send = {
             "user_id": user.USER_ID,
             "cam_id": cam.CAM_ID
         }
 
-        json_data = json.dumps(data_to_send)
+        # json_data = json.dumps(data_to_send)
+        #
+        # user_table = models.GigaUser
+        # cam_table = models.GigaCam
+        # user_cam_table = models.GigaUserCam
+        #
+        # with engine.connect() as conn:
+        #     trans = conn.begin()
+        #     user_code = user.USER_CODE
+        #     cam_code = cam.CAM_CODE
+        #     user_select_result = user_crud.selectUserCodeDB(conn, table=user_cam_table, user_code=user_code,
+        #                                                     cam_code=cam_code)
+        #     # if user_select_result:
+        #     #     print("user_select_result : ", user_select_result)
+        #     #     return {"res_code": 991}
+        #
+        #     # if user_select_result is not None:
+        #     #     print("user_select_result is not None")
+        #     #     return {"res_code": "400"}
+        #
+        #     with create_httpx_client() as client:
+        #
+        #         print("java session 호출")
+        #
+        #         response = client.post('http://192.168.1.79:8443/test1', data=json_data,
+        #                                headers={'Content-Type': 'application/json'})
+        #
+        #         print(response)
+        #         response_content = response.content.decode("utf-8")
+        #         response_data = json.loads(response_content)
+        #         res_code = response_data.get("res_code")
+        #
+        #         print("res_code " + str(res_code))
+        #
+        #         print("session 호출 끝")
+        #         if res_code != 200:
+        #             return {"res_code": "400"}
+        #
+        #         user_create_result = user_crud.insert_user_cam_info(conn, table=user_table, data=user)
+        #         print("user_create_result : " + str(user_create_result.get("res_code")))
+        #         if user_create_result.get("res_code") != 200:
+        #             raise HTTPException(status_code=400, detail="User insert failed")
+        #
+        #         cam_create_result = user_crud.insert_user_cam_info(conn, table=cam_table, data=cam)
+        #         print("cam_create_result : " + str(cam_create_result.get("res_code")))
+        #         if cam_create_result.get("res_code") != 200:
+        #             raise HTTPException(status_code=400, detail="Cam insert failed")
+        #
+        #         user_cam_dict = {
+        #             "USER_CODE": user.USER_CODE,
+        #             "CAM_CODE": cam.CAM_CODE,
+        #             "USER_CAM_CODE": user.USER_CODE + str(cam.CAM_CODE),
+        #             "WOWZA_INDEX": 1
+        #         }
+        #
+        #         user_cam_create_result = user_crud.insert_user_cam_info(conn, table=user_cam_table, data=user_cam_dict)
+        #         print("user_cam_insert : " + str(user_cam_create_result.get("res_code")))
+        #         if user_cam_create_result.get("res_code") != 200:
+        #             raise HTTPException(status_code=400, detail="UserCam insert failed")
+        #
+        #         trans.commit()
 
-        user_table = models.GigaUser
-        cam_table = models.GigaCam
-        user_cam_table = models.GigaUserCam
+        cam_ip = "121.134.26.70"
+        onvif_port = "38080"
 
-        with engine.connect() as conn:
-            trans = conn.begin()
-            user_code = user.USER_CODE
-            cam_code = cam.CAM_CODE
-            user_select_result = user_crud.selectUserCodeDB(conn, table=user_cam_table, user_code=user_code,
-                                                            cam_code=cam_code)
-            # if user_select_result:
-            #     print("user_select_result : ", user_select_result)
-            #     return {"res_code": 991}
+        result_profiles = xml.read_xml_file("../service/GetProfiles")
 
-            # if user_select_result is not None:
-            #     print("user_select_result is not None")
-            #     return {"res_code": "400"}
+        profiles_response = xml.send_onvif_request(cam_ip, onvif_port, result_profiles, "getProfiles")
 
-            with create_httpx_client() as client:
+        result_list = xml.test_xml_list(profiles_response.decode('utf-8'))
 
-                print("java session 호출")
+        result_getprofile = xml.read_xml_file("../service/GetProfile")
 
-                response = client.post('http://192.168.1.79:9090/test1', data=json_data,
-                                       headers={'Content-Type': 'application/json'})
+        for profile in result_list:
 
-                print(response)
-                response_content = response.content.decode("utf-8")
-                response_data = json.loads(response_content)
-                res_code = response_data.get("res_code")
+            change_profile = xml.profile_xml_change(result_getprofile, profile)
 
-                print("res_code " + str(res_code))
+            getprofile_response = xml.send_onvif_request(cam_ip, onvif_port, change_profile, "getProfile")
 
-                print("session 호출 끝")
-                if res_code != 200:
-                    return {"res_code": "400"}
+            result_resolution = xml.resolution_read(getprofile_response.decode('utf-8'))
 
-                user_create_result = user_crud.insert_user_cam_info(conn, table=user_table, data=user)
-                print("user_create_result : " + str(user_create_result.get("res_code")))
-                if user_create_result.get("res_code") != 200:
-                    raise HTTPException(status_code=400, detail="User insert failed")
+            if result_resolution.get("width") is None:
+                change_profile = xml.ver_change(change_profile)
 
-                cam_create_result = user_crud.insert_user_cam_info(conn, table=cam_table, data=cam)
-                print("cam_create_result : " + str(cam_create_result.get("res_code")))
-                if cam_create_result.get("res_code") != 200:
-                    raise HTTPException(status_code=400, detail="Cam insert failed")
+                getprofile_response = xml.send_onvif_request(cam_ip, onvif_port, change_profile, "getProfile")
 
-                user_cam_dict = {
-                    "USER_CODE": user.USER_CODE,
-                    "CAM_CODE": cam.CAM_CODE,
-                    "USER_CAM_CODE": user.USER_CODE + str(cam.CAM_CODE),
-                    "WOWZA_INDEX": 1
-                }
+                result_resolution = xml.resolution_read(getprofile_response.decode('utf-8'))
 
-                user_cam_create_result = user_crud.insert_user_cam_info(conn, table=user_cam_table, data=user_cam_dict)
-                print("user_cam_insert : " + str(user_cam_create_result.get("res_code")))
-                if user_cam_create_result.get("res_code") != 200:
-                    raise HTTPException(status_code=400, detail="UserCam insert failed")
+            result_url_xml = xml.read_xml_file("../service/GetStreamUri")
 
-                trans.commit()
+            change_uri_profile = xml.profile_xml_change(result_url_xml, profile)
+
+            rtsp_uri_response = xml.send_onvif_request(cam_ip, onvif_port, change_uri_profile, "GetStreamUri")
+
+            rtsp_uri = xml.rtsp_uri_result(rtsp_uri_response.decode('utf-8'))
+
+            print(rtsp_uri)
+            if int(result_resolution.get("width")) == 1920:
+                livetype = 'gigaeyeslive'
+            elif int(result_resolution.get("width")) == 352:
+                livetype = 'gigaeyescif'
+            else:
+                livetype = 'gigaeyesmonitor'
+
+            url = f'http://192.168.1.79:8087/v2/servers/_defaultServer_/vhosts/_defaultVHost_/applications/{livetype}/streamfiles/{usercamcode}'
+
+            headers = {
+                "Accept": "application/json",
+                "Content-Type": "application/json"
+            }
+
+            data = {
+                "restURI": f"http://192.168.1.79:8087/v2/servers/defaultServer/vhosts/defaultVHost/applications/{livetype}/streamfiles",
+                "streamFiles": [
+                    {
+                        "id": "connectAppName=demo&appInstance=_definst_&mediaCasterType=rtp",
+                        "href": f"http://192.168.1.79:8087/v2/servers/defaultServer/vhosts/defaultVHost/applications/{livetype}/streamfiles/connectAppName=p_demo&appInstance=_definst_&mediaCasterType=rtp"
+                    }
+                ]
+            }
+
+            auth = requests.auth.HTTPDigestAuth("gigasurv", "Gigasurv@34")
+
+            requests.post(url, json=data, headers=headers, auth=auth)
+
+            url = f"http://192.168.1.79:8087/v2/servers/_defaultServer_/vhosts/_defaultVHost_/applications/{livetype}/streamfiles/{usercamcode}/adv"
+
+            data = {
+                "restURI": f"http://192.168.1.79:8087/v2/servers/_defaultServer_/vhosts/_defaultVHost_/applications/{livetype}/streamfiles/{usercamcode}/adv",
+                "advancedSettings": [
+                    {
+                        "enabled": True,
+                        "canRemove": True,
+                        "name": "uri",
+                        "value": f"{rtsp_uri}",
+                        "type": "String",
+                        "sectionName": "Common",
+                        "documented": True
+                    },
+                    {
+                        "enabled": True,
+                        "canRemove": True,
+                        "name": "rtspFilterUnknownTracks",
+                        "value": "true",
+                        "defaultValue": "false",
+                        "type": "Boolean",
+                        "sectionName": "RTSP",
+                        "documented": True
+                    },
+                    {
+                        "enabled": True,
+                        "canRemove": True,
+                        "name": "rtpTransportMode",
+                        "value": "tcp",
+                        "defaultValue": "udp",
+                        "type": "String",
+                        "sectionName": "RTSP",
+                        "documented": True
+                    },
+                    {
+                        "enabled": True,
+                        "canRemove": True,
+                        "name": "rtspStreamAudioTrack",
+                        "value": "false",
+                        "defaultValue": "false",
+                        "type": "Boolean",
+                        "sectionName": "RTSP",
+                        "documented": True
+                    }
+                ]
+            }
+
+            response = requests.put(url, json=data, headers=headers, auth=auth)
+
+            if livetype == "gigaeyeslive":
+                url = f"http://192.168.1.79:8087/v2/servers/_defaultServer_/vhosts/_defaultVHost_/applications/{livetype}/streamfiles/{usercamcode}/actions/connect?connectAppName={livetype}&appInstance=_definst_&mediaCasterType=rtp"
+                requests.put(url, json=data, headers=headers, auth=auth)
 
         return {"res_code": 200}
 
@@ -252,8 +372,8 @@ def create_user(user_cam: schemas.UserCamCreate, db: Session = Depends(get_db)):
         print(f"Error during transaction: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
-    finally:
-        conn.close()
+    # finally:
+    #     conn.close()
 
 
 # @user_router.post("/V100/VMS_10001/cam_info_register", response_model=dict)

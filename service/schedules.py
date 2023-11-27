@@ -9,7 +9,6 @@ import core.log as common
 
 log = common.logging.getLogger("api")
 
-
 scheduler = BackgroundScheduler()
 scheduler.start()
 
@@ -17,10 +16,12 @@ scheduler.start()
 def check_rtsp_connection():
     table = models.GigaWowza
     camera_info = user_crud.selectAllDB(engine, table)
-    print(camera_info)
+    table = models.GigaUserCam
+    user_cam_info = user_crud.selectAllDB(engine, table)
+    usercamcode = user_cam_info.get("USER_CODE")+"_"+user_cam_info.get("CAM_CODE")
     for camera in camera_info:
-        rtsp_url = f"rtsp://{camera['ADMIN_ID']}:{camera['ADMIN_PWD']}@{camera['PRIVATE_IP']}:{camera['PORT']}/cam/realmonitor?channel=1&subtype=0&unicast=true&proto=Onvif"
-
+        rtsp_url = f"rtsp://{camera['PRIVATE_IP']}:1935/gigaeyeslive/{usercamcode}.stream"
+        print(rtsp_url)
         try:
             # RTSP 스트리밍 테스트
             cap = cv2.VideoCapture(rtsp_url)
@@ -34,11 +35,9 @@ def check_rtsp_connection():
         except Exception as e:
             print(f"Error: {str(e)}")
 
-# scheduler.add_job(check_rtsp_connection, 'interval', minutes=5)
-scheduler.add_job(check_rtsp_connection, 'interval',seconds=60)
 
+# scheduler.add_job(check_rtsp_connection, 'interval', minutes=5)
+scheduler.add_job(check_rtsp_connection, 'interval', seconds=20)
 
 # 어플리케이션이 종료될 때 APScheduler도 종료
 atexit.register(lambda: scheduler.shutdown())
-
-

@@ -22,6 +22,7 @@ camera_info = [
     },
 ]
 
+
 # 카메라 테스트 함수
 def test_camera(camera):
     web_url = f"http://{camera['ip']}:{camera['web_port']}"
@@ -29,6 +30,7 @@ def test_camera(camera):
 
     print(f"Testing {camera['name']}...")
 
+    print(rtsp_url)
     try:
         # 웹 페이지 접속 테스트
         response = requests.get(web_url, auth=HTTPBasicAuth(camera['username'], camera['password']))
