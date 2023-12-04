@@ -9,33 +9,6 @@ import core.config_yaml_read as config
 
 print("database.py is being imported")
 
-# load_dotenv('core/config_old.env')
-
-# dbName = os.getenv("dbName")
-# dbPassWord = os.getenv("dbPassWord")
-# dbIp = os.getenv("dbIp")
-# dbPort = os.getenv("dbPort")
-# dbSchema = os.getenv("dbSchema")
-# pool_size = os.getenv("pool_size")
-# max_overflow = os.getenv("max_overflow")
-# autocommit = os.getenv("autocommit")
-# autoflush = os.getenv("autoflush")
-
-# config = configparser.ConfigParser()
-# with open('config/database.ini', encoding='utf-8') as config_file:
-#     config.read_file(config_file)
-
-# ## DB 주소
-# dbName = config['database']['dbName']
-# dbPassWord = config['database']['dbPassWord']
-# dbIp = config['database']['dbIp']
-# dbPort = config['database']['dbPort']
-# dbSchema = config['database']['dbSchema']
-# config_pool_size = config['database']['pool_size']
-# config_max_overflow = config['database']['max_overflow']
-# autocommit = config['database']['autocommit']
-# autoflush = config['database']['autoflush']
-
 DATABASE_CONFIG = config.DATABASE_CONFIG
 
 dbName = DATABASE_CONFIG["dbName"]

@@ -21,4 +21,11 @@ REST_DEBUG: true
 REST_HOST: localhost
 REST_PORT: 8443
 
-
+WOWZA:
+  ID: 'gigasurv'
+  PASSWORD: 'Gigasurv@34'
+  STREAM_FILE: 'http://{ip}:{port}/v2/servers/defaultServer/vhosts/defaultVHost/applications/{live_type}/streamfiles'
+  STREAM_FILE_PROFILE: 'http://{ip}:{port}/v2/servers/_defaultServer_/vhosts/_defaultVHost_/applications/{live_type}/streamfiles/{stream_file_name}'
+  STREAM_FILE_UPDATE: 'http://{ip}:{port}/v2/servers/_defaultServer_/vhosts/_defaultVHost_/applications/{live_type}/streamfiles/{stream_file_name}/adv'
+  STREAM_FILE_CURRENT: 'http://{ip}:{port}/v2/servers/defaultServer/vhosts/defaultVHost/applications/{live_type}/streamfiles/connectAppName=p_demo&appInstance=_definst_&mediaCasterType=rtp'
+  STREAM_CONNECT: 'http://192.168.1.79:8087/v2/servers/_defaultServer_/vhosts/_defaultVHost_/applications/{live_type}/streamfiles/{stream_file_name}/actions/connect?connectAppName={live_type}&appInstance=_definst_&mediaCasterType=rtp'

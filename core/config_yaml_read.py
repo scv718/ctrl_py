@@ -30,6 +30,15 @@ httpx_max_keepalive = config.get('HTTPX_MAX_KEEPALIVE', 100)  # Suitable default
 httpx_debug = config.get('HTTPX_DEBUG', 'True') in [True, '1']
 httpx_timeout = config.get('HTTPX_TIMEOUT', 10.0)
 
+
+stream_file = config.get('WOWZA', {}).get('STREAM_FILE')
+stream_file_profile = config.get('WOWZA', {}).get('STREAM_FILE_PROFILE')
+stream_file_update = config.get('WOWZA', {}).get('STREAM_FILE_UPDATE')
+stream_file_current = config.get('WOWZA', {}).get('STREAM_FILE_CURRENT')
+stream_connect = config.get('WOWZA', {}).get('STREAM_CONNECT')
+wowza_id = config.get('WOWZA', {}).get('ID')
+wowza_password = config.get('WOWZA', {}).get('PASSWORD')
+
 # 설정 값을 딕셔너리로 구성
 DATABASE_CONFIG = {
     'dbName': dbName,
@@ -56,4 +65,14 @@ HTTPX_CLIENT_CONFIG = {
     'max_request_size': httpx_max_keepalive,
     'debug': httpx_debug,
     'timeout': httpx_timeout
+}
+
+WOWZA_CONFIG = {
+    'wowza_id': wowza_id,
+    'wowza_password': wowza_password,
+    'stream_file': stream_file,
+    'stream_file_profile': stream_file_profile,
+    'stream_file_update': stream_file_update,
+    'stream_file_current': stream_file_current,
+    'stream_connect': stream_connect
 }

@@ -1,6 +1,7 @@
 import requests
 from requests.auth import HTTPDigestAuth
 import xml.etree.ElementTree as ET
+import re
 
 
 def read_xml_file(file_path):
@@ -151,42 +152,16 @@ def ver_change(xml_string):
 
     return modified_xml_string
 
+
 def rtsp_uri_result(xml_string):
     root = ET.fromstring(xml_string)
 
     rtsp_address = root.find('.//{http://www.onvif.org/ver10/schema}Uri').text
 
-    new_rtsp_address = f"rtsp://admin:1q2w3e4r!@{rtsp_address.split('/')[2]}:38050{rtsp_address.split(':554')[1]}"
+    print(rtsp_address)
+
+    new_port = 38050
+    new_rtsp_address = re.sub(r'rtsp://([^:/]+):\d+', rf'rtsp://admin:1q2w3e4r!@\1:{new_port}', rtsp_address)
+    # new_rtsp_address = f"rtsp://admin:1q2w3e4r!@{rtsp_address.split('/')[2]}:38050{rtsp_address.split(':554')[1]}"
 
     return new_rtsp_address
-cam_ip = "121.134.26.70"
-onvif_port = "38080"
-
-result_getProfiles = read_xml_file("../service/GetProfiles")
-
-getProfiles_response = send_onvif_request(cam_ip, onvif_port, result_getProfiles, "getProfiles")
-
-result_list = test_xml_list(getProfiles_response.decode('utf-8'))
-
-# print(result_list)
-
-result_getProfile = read_xml_file("../service/GetProfile")
-
-# print(result_getProfile)
-change_profile = profile_xml_change(result_getProfile, result_list[0])
-#
-# print(change_profile)
-getProfile_response = send_onvif_request(cam_ip, onvif_port, change_profile, "getProfile")
-
-result_url_xml = read_xml_file("../service/GetStreamUri")
-
-rtspuri_response = send_onvif_request(cam_ip, onvif_port, result_url_xml, "GetStreamUri")
-
-
-print(rtsp_uri_result(rtspuri_response.decode('utf-8')))
-
-# print(getProfile_response)
-
-# result_resolution = resolution_read(getProfile_response.decode('utf-8'))
-#
-# print(result_resolution)

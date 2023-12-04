@@ -35,16 +35,6 @@ def test_camera(camera_info):
         print(f"Testing {camera['WOWZA_INDEX']}...")
 
         try:
-            # 웹 페이지 접속 테스트
-            # response = requests.get(web_url, auth=HTTPBasicAuth(camera['ADMIN_ID'], camera['ADMIN_PWD']))
-
-            # print("response code : {}", response.__dict__)
-            # if response.status_code == 200:
-            #     print(f"Web Access to WOWZA_INDEX: {camera['WOWZA_INDEX']} - Success")
-            # else:
-            #     print(f"Web Access to WOWZA_INDEX: {camera['WOWZA_INDEX']} - Failed")
-
-
                 # RTSP 스트리밍 테스트
             # cap = cv2.VideoCapture(rtsp_url)
             # print(cap.get(cv2.CAP_PROP_BITRATE))

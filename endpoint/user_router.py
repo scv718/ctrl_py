@@ -1,17 +1,16 @@
-import json
 import requests
 from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
-import asyncio
 from sqlalchemy.orm import Session
-import time
 import db.gigaeyes_models as models
 import db.gigaeyes_schema as schemas
-import service.camera as camera
+import service.test_camera as camera
 import service.user_crud as user_crud
-from core.rest_httpx import create_httpx_client, send_data
-from core.async_httpx import async_send
 from db.database import SessionLocal, engine
 import service.xml_read as xml
+import service.cam_register as cam_register
+import service.xml_service as xml_result
+import core.config_yaml_read as config
+from service.wowza_service import Wowza
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -26,124 +25,9 @@ def get_db():
         db.close()
 
 
-@user_router.post("/test/normal", response_model=dict)
-async def test_(request: Request):
-    try:
-        json_data = await request.json()
-        url = 'http://localhost:18080/VMS_TEST/session'
-        data = send_data(url, json_data)
-        print(data)
-
-    except Exception as e:
-        print(f"Error: {e}")
-        import traceback
-        traceback.print_exc()
-        raise
-    return {"res_code": 200}
-
-
-async def sleep_task(json_data):
-    await asyncio.sleep(10)
-    url = 'http://localhost:18080/VMS_TEST/session'
-    data = send_data(url, json_data)
-    print("first ", data)
-    return {"message": "10 seconds"}
-
-
-async def sleep_task2(json_data):
-    await asyncio.sleep(3)
-    url = 'http://localhost:18080/VMS_TEST/session'
-    data = send_data(url, json_data)
-    print("seconds ", data)
-    return {"message": "3 seconds"}
-
-
-def background_task(result):
-    print(f"Background task result: {result}")
-
-
-def background_task_1(result):
-    time.sleep(5)
-    print(f"Background task1 result: {result}")
-
-
-def background_task_2(result):
-    time.sleep(1)
-    print(f"Background task2 result: {result}")
-
-
-@user_router.post("/test/test", response_model=dict)
-async def test_(request: Request, background_tasks: BackgroundTasks):
-    try:
-        print("start")
-        json_data = await request.json()
-
-        # case 1
-        # third > first > seconds
-        # background_tasks.add_task(sleep_task, json_data)
-        # print("keep going?")
-        # background_tasks.add_task(sleep_task2, json_data)
-        # url = 'http://localhost:18080/VMS_TEST/session'
-        # data = send_data(url, json_data)
-
-        # case 2
-        # seconds > first > third
-        # results = await asyncio.gather(
-        #     sleep_task(json_data),
-        #     sleep_task2(json_data),
-        # )
-        # background_tasks.add_task(background_task, results[0])
-        # background_tasks.add_task(background_task, results[1])
-        # url = 'http://localhost:18080/VMS_TEST/session'
-        # data = send_data(url, json_data)
-
-        # case 3
-        # third > seconds > first
-        task1 = asyncio.create_task(sleep_task(json_data))
-        task2 = asyncio.create_task(sleep_task2(json_data))
-        task1.add_done_callback(lambda t: background_task_1(t.result()))
-        task2.add_done_callback(lambda t: background_task_2(t.result()))
-        url = 'http://localhost:18080/VMS_TEST/session'
-        data = send_data(url, json_data)
-        print("third ", data)
-        print("end")
-
-    except Exception as e:
-        print(f"Error: {e}")
-        import traceback
-        traceback.print_exc()
-        raise
-    return {"res_code": 200}
-
-
-@user_router.post("/Vtest", response_model=dict)
-async def report(request: Request):
-    try:
-        json_data = await request.json()
-        key = json_data["key"]
-        if key == "cam_status_report":
-            print(key)
-
-        else:
-            print("key")
-            url = 'http://localhost:18080/VMS_TEST/session'
-            send_data(url, json_data)
-            return {"res_code": 200}
-
-    except Exception as e:
-        raise HTTPException(status_code=400, detail="Internal Server Error")
-
-
 @user_router.post("/V100/VMS_10005/live_video_stream_urls", response_model=dict)
 async def select_vms_user(request: Request):
     json_data = await request.json()
-    print(json_data)
-
-    # table = models.GigaUser()
-    # select_user_data = user_crud.selectJson(engine, table, json_data)
-    #
-    # table = models.GigaCam()
-    # select_cam_data = user_crud.selectJson(engine, table, json_data)
 
     table = models.GigaUserCam()
     select_user_cam_data = user_crud.selectJson(engine, table, json_data)
@@ -152,6 +36,7 @@ async def select_vms_user(request: Request):
     # if select_user_data and select_cam_data:
     if select_user_cam_data:
         first_row = select_user_cam_data[0]
+        user_cam_code = select_user_cam_data[0].get("USER_CODE") + "_" + str(select_user_cam_data[0].get("CAM_CODE"))
         wowza_index = first_row.get('WOWZA_INDEX')
         wowza_dict = {
             "WOWZA_INDEX": wowza_index
@@ -162,11 +47,12 @@ async def select_vms_user(request: Request):
 
         print("wowza_data : ", wowza_data)
 
-        streaming_url = camera.test_camera(wowza_data)
+        url = camera.test_camera(wowza_data, user_cam_code)
 
-        print("url: " + streaming_url)
-        if streaming_url is not None:
-            return {"res_code": 200, "data": {"url": streaming_url}}
+        print(url)
+
+        if url.get("res_code") == "200":
+            return {"res_code": 200, "data": {"url": url.get("url")}}
         else:
             return {"res_code": 911}
     else:
@@ -175,282 +61,121 @@ async def select_vms_user(request: Request):
 
 
 @user_router.post("/V100/VMS_10001/cam_info_register", response_model=dict)
-def create_user(user_cam: schemas.UserCamCreate, db: Session = Depends(get_db)):
+def create_user(user_cam: schemas.UserCamCreate):
     try:
-        print(user_cam)
-        user = user_cam.user
-        cam = user_cam.cam
-        usercamcode = user.USER_CODE + "_" + str(cam.CAM_CODE)
+        db_result = cam_register.cam_info_register(user_cam)
 
-        data_to_send = {
-            "user_id": user.USER_ID,
-            "cam_id": cam.CAM_ID
-        }
+        res_code = db_result.get("res_code")
 
-        # json_data = json.dumps(data_to_send)
-        #
-        # user_table = models.GigaUser
-        # cam_table = models.GigaCam
-        # user_cam_table = models.GigaUserCam
-        #
-        # with engine.connect() as conn:
-        #     trans = conn.begin()
-        #     user_code = user.USER_CODE
-        #     cam_code = cam.CAM_CODE
-        #     user_select_result = user_crud.selectUserCodeDB(conn, table=user_cam_table, user_code=user_code,
-        #                                                     cam_code=cam_code)
-        #     # if user_select_result:
-        #     #     print("user_select_result : ", user_select_result)
-        #     #     return {"res_code": 991}
-        #
-        #     # if user_select_result is not None:
-        #     #     print("user_select_result is not None")
-        #     #     return {"res_code": "400"}
-        #
-        #     with create_httpx_client() as client:
-        #
-        #         print("java session 호출")
-        #
-        #         response = client.post('http://192.168.1.79:8443/test1', data=json_data,
-        #                                headers={'Content-Type': 'application/json'})
-        #
-        #         print(response)
-        #         response_content = response.content.decode("utf-8")
-        #         response_data = json.loads(response_content)
-        #         res_code = response_data.get("res_code")
-        #
-        #         print("res_code " + str(res_code))
-        #
-        #         print("session 호출 끝")
-        #         if res_code != 200:
-        #             return {"res_code": "400"}
-        #
-        #         user_create_result = user_crud.insert_user_cam_info(conn, table=user_table, data=user)
-        #         print("user_create_result : " + str(user_create_result.get("res_code")))
-        #         if user_create_result.get("res_code") != 200:
-        #             raise HTTPException(status_code=400, detail="User insert failed")
-        #
-        #         cam_create_result = user_crud.insert_user_cam_info(conn, table=cam_table, data=cam)
-        #         print("cam_create_result : " + str(cam_create_result.get("res_code")))
-        #         if cam_create_result.get("res_code") != 200:
-        #             raise HTTPException(status_code=400, detail="Cam insert failed")
-        #
-        #         user_cam_dict = {
-        #             "USER_CODE": user.USER_CODE,
-        #             "CAM_CODE": cam.CAM_CODE,
-        #             "USER_CAM_CODE": user.USER_CODE + str(cam.CAM_CODE),
-        #             "WOWZA_INDEX": 1
-        #         }
-        #
-        #         user_cam_create_result = user_crud.insert_user_cam_info(conn, table=user_cam_table, data=user_cam_dict)
-        #         print("user_cam_insert : " + str(user_cam_create_result.get("res_code")))
-        #         if user_cam_create_result.get("res_code") != 200:
-        #             raise HTTPException(status_code=400, detail="UserCam insert failed")
-        #
-        #         trans.commit()
+        if res_code != "200":
+            return db_result
 
-        cam_ip = "121.134.26.70"
-        onvif_port = "38080"
+        db_data = db_result.get("data")
 
-        result_profiles = xml.read_xml_file("../service/GetProfiles")
+        wowza_instance = Wowza(db_data)
 
-        profiles_response = xml.send_onvif_request(cam_ip, onvif_port, result_profiles, "getProfiles")
+        cam_ip = str(db_data.get("PRIVATE_IP"))
+        onvif_port = str(db_data.get("ONVIF_PORT"))
 
-        result_list = xml.test_xml_list(profiles_response.decode('utf-8'))
+        result_list = xml_result.profile_list_result(cam_ip, onvif_port)
 
-        result_getprofile = xml.read_xml_file("../service/GetProfile")
+        if result_list is None:
+            print("Data is None")
+            raise HTTPException(status_code=400, detail="Data is None")
 
-        for profile in result_list:
+        for profile_name, profile_data in result_list.items():
+            result_resolution = profile_data.get("width")
+            rtsp_uri = profile_data.get("rtsp_uri")
 
-            change_profile = xml.profile_xml_change(result_getprofile, profile)
+            wowza_instance.__settype__(int(result_resolution))
 
-            getprofile_response = xml.send_onvif_request(cam_ip, onvif_port, change_profile, "getProfile")
+            wowza_instance.create_stream_file()
 
-            result_resolution = xml.resolution_read(getprofile_response.decode('utf-8'))
+            wowza_instance.update_stream_file(rtsp_uri)
 
-            if result_resolution.get("width") is None:
-                change_profile = xml.ver_change(change_profile)
+            if wowza_instance.live_type == "pythongigaeyeslive":
+                wowza_instance.connect_stream()
 
-                getprofile_response = xml.send_onvif_request(cam_ip, onvif_port, change_profile, "getProfile")
-
-                result_resolution = xml.resolution_read(getprofile_response.decode('utf-8'))
-
-            result_url_xml = xml.read_xml_file("../service/GetStreamUri")
-
-            change_uri_profile = xml.profile_xml_change(result_url_xml, profile)
-
-            rtsp_uri_response = xml.send_onvif_request(cam_ip, onvif_port, change_uri_profile, "GetStreamUri")
-
-            rtsp_uri = xml.rtsp_uri_result(rtsp_uri_response.decode('utf-8'))
-
-            print(rtsp_uri)
-            if int(result_resolution.get("width")) == 1920:
-                livetype = 'gigaeyeslive'
-            elif int(result_resolution.get("width")) == 352:
-                livetype = 'gigaeyescif'
-            else:
-                livetype = 'gigaeyesmonitor'
-
-            url = f'http://192.168.1.79:8087/v2/servers/_defaultServer_/vhosts/_defaultVHost_/applications/{livetype}/streamfiles/{usercamcode}'
-
-            headers = {
-                "Accept": "application/json",
-                "Content-Type": "application/json"
-            }
-
-            data = {
-                "restURI": f"http://192.168.1.79:8087/v2/servers/defaultServer/vhosts/defaultVHost/applications/{livetype}/streamfiles",
-                "streamFiles": [
-                    {
-                        "id": "connectAppName=demo&appInstance=_definst_&mediaCasterType=rtp",
-                        "href": f"http://192.168.1.79:8087/v2/servers/defaultServer/vhosts/defaultVHost/applications/{livetype}/streamfiles/connectAppName=p_demo&appInstance=_definst_&mediaCasterType=rtp"
-                    }
-                ]
-            }
-
-            auth = requests.auth.HTTPDigestAuth("gigasurv", "Gigasurv@34")
-
-            requests.post(url, json=data, headers=headers, auth=auth)
-
-            url = f"http://192.168.1.79:8087/v2/servers/_defaultServer_/vhosts/_defaultVHost_/applications/{livetype}/streamfiles/{usercamcode}/adv"
-
-            data = {
-                "restURI": f"http://192.168.1.79:8087/v2/servers/_defaultServer_/vhosts/_defaultVHost_/applications/{livetype}/streamfiles/{usercamcode}/adv",
-                "advancedSettings": [
-                    {
-                        "enabled": True,
-                        "canRemove": True,
-                        "name": "uri",
-                        "value": f"{rtsp_uri}",
-                        "type": "String",
-                        "sectionName": "Common",
-                        "documented": True
-                    },
-                    {
-                        "enabled": True,
-                        "canRemove": True,
-                        "name": "rtspFilterUnknownTracks",
-                        "value": "true",
-                        "defaultValue": "false",
-                        "type": "Boolean",
-                        "sectionName": "RTSP",
-                        "documented": True
-                    },
-                    {
-                        "enabled": True,
-                        "canRemove": True,
-                        "name": "rtpTransportMode",
-                        "value": "tcp",
-                        "defaultValue": "udp",
-                        "type": "String",
-                        "sectionName": "RTSP",
-                        "documented": True
-                    },
-                    {
-                        "enabled": True,
-                        "canRemove": True,
-                        "name": "rtspStreamAudioTrack",
-                        "value": "false",
-                        "defaultValue": "false",
-                        "type": "Boolean",
-                        "sectionName": "RTSP",
-                        "documented": True
-                    }
-                ]
-            }
-
-            response = requests.put(url, json=data, headers=headers, auth=auth)
-
-            if livetype == "gigaeyeslive":
-                url = f"http://192.168.1.79:8087/v2/servers/_defaultServer_/vhosts/_defaultVHost_/applications/{livetype}/streamfiles/{usercamcode}/actions/connect?connectAppName={livetype}&appInstance=_definst_&mediaCasterType=rtp"
-                requests.put(url, json=data, headers=headers, auth=auth)
+            # url = f'http://192.168.1.79:8087/v2/servers/_defaultServer_/vhosts/_defaultVHost_/applications/{live_type}/streamfiles/{stream_file_name}'
+            # url = config.WOWZA_CONFIG['stream_file_profile'].format(ip=wowza_ip,port=port,live_type=live_type, stream_file_name=stream_file_name)
+            #
+            # headers = {
+            #     "Accept": "application/json",
+            #     "Content-Type": "application/json"
+            # }
+            #
+            # data = {
+            #     "restURI": config.WOWZA_CONFIG['stream_file'].format(ip=wowza_ip,port=port,live_type=live_type),
+            #     "streamFiles": [
+            #         {
+            #             "id": "connectAppName=demo&appInstance=_definst_&mediaCasterType=rtp",
+            #             "href": config.WOWZA_CONFIG['stream_file_current'].format(ip=wowza_ip,port=port,live_type=live_type)
+            #         }
+            #     ]
+            # }
+            #
+            # auth = requests.auth.HTTPDigestAuth(config.WOWZA_CONFIG['wowza_id'], config.WOWZA_CONFIG['wowza_password'])
+            #
+            # requests.post(url, json=data, headers=headers, auth=auth)
+            #
+            # # url = f"http://192.168.1.79:8087/v2/servers/_defaultServer_/vhosts/_defaultVHost_/applications/{live_type}/streamfiles/{stream_file_name}/adv"
+            # url = config.WOWZA_CONFIG['stream_file_update'].format(ip=wowza_ip,port=port,live_type=live_type, stream_file_name=stream_file_name)
+            # data = {
+            #     "restURI": config.WOWZA_CONFIG['stream_file_update'].format(ip=wowza_ip,port=port,live_type=live_type, stream_file_name=stream_file_name),
+            #     "advancedSettings": [
+            #         {
+            #             "enabled": True,
+            #             "canRemove": True,
+            #             "name": "uri",
+            #             "value": f"{rtsp_uri}",
+            #             "type": "String",
+            #             "sectionName": "Common",
+            #             "documented": True
+            #         },
+            #         {
+            #             "enabled": True,
+            #             "canRemove": True,
+            #             "name": "rtspFilterUnknownTracks",
+            #             "value": "true",
+            #             "defaultValue": "false",
+            #             "type": "Boolean",
+            #             "sectionName": "RTSP",
+            #             "documented": True
+            #         },
+            #         {
+            #             "enabled": True,
+            #             "canRemove": True,
+            #             "name": "rtpTransportMode",
+            #             "value": "tcp",
+            #             "defaultValue": "udp",
+            #             "type": "String",
+            #             "sectionName": "RTSP",
+            #             "documented": True
+            #         },
+            #         {
+            #             "enabled": True,
+            #             "canRemove": True,
+            #             "name": "rtspStreamAudioTrack",
+            #             "value": "false",
+            #             "defaultValue": "false",
+            #             "type": "Boolean",
+            #             "sectionName": "RTSP",
+            #             "documented": True
+            #         }
+            #     ]
+            # }
+            #
+            # response = requests.put(url, json=data, headers=headers, auth=auth)
+            #
+            # if live_type == "pythongigaeyeslive":
+            #     url = config.WOWZA_CONFIG['stream_connect'].format(ip=wowza_ip,port=port,live_type=live_type, stream_file_name=stream_file_name)
+            #     requests.put(url, json=data, headers=headers, auth=auth)
 
         return {"res_code": 200}
 
     except Exception as e:
-        # 모든 다른 예외에 대한 처리
         print(f"Error during transaction: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")
-
-    # finally:
-    #     conn.close()
-
-
-# @user_router.post("/V100/VMS_10001/cam_info_register", response_model=dict)
-# def create_user(user_cam: schemas.UserCamCreate, db: Session = Depends(get_db)):
-#     try:
-#         print(user_cam)
-#         # user = user_cam.user
-#         # cam = user_cam.cam
-#
-#         data_to_send = {
-#             "user_id": user_cam.USER_ID,
-#             "cam_id": user_cam.CAM_ID
-#         }
-#
-#         json_data = json.dumps(data_to_send)
-#
-#         user_table = models.GigaUser
-#         cam_table = models.GigaCam
-#         user_cam_table = models.GigaUserCam
-#
-#         with db.begin() as transaction:
-#             user_code = user_cam.USER_CODE
-#             user_select_result = user_crud.selectUserCodeDB(engine, table=user_table, user_code=user_code)
-#             print("user_select " + str(user_select_result))
-#
-#             # if user_select_result is not None:
-#             #     print("user_select_result is not None")
-#             #     return {"res_code": "400"}
-#
-#             with create_httpx_client() as client:
-#
-#                 print("java session 호출")
-#
-#                 response = client.post('http://localhost:18080/VMS_TEST/session', data=json_data,
-#                                        headers={'Content-Type': 'application/json'})
-#
-#                 print(response)
-#                 response_content = response.content.decode("utf-8")
-#                 response_data = json.loads(response_content)
-#                 res_code = response_data.get("res_code")
-#
-#                 print("res_code " + str(res_code))
-#
-#                 print("session 호출 끝")
-#                 if res_code != 200:
-#                     return {"res_code": "400"}
-#
-#                 user_create_result = user_crud.insertDB(engine, table=user_table, data=user_cam)
-#                 print("user_create_result : " + str(user_create_result.get("res_code")))
-#                 if user_create_result.get("res_code") != 200:
-#                     raise HTTPException(status_code=400, detail="User insert failed")
-#
-#                 cam_create_result = user_crud.insertDB(engine, table=cam_table, data=user_cam)
-#                 print("cam_create_result : " + str(cam_create_result.get("res_code")))
-#                 if cam_create_result.get("res_code") != 200:
-#                     raise HTTPException(status_code=400, detail="Cam insert failed")
-#
-#                 user_cam_dict = {
-#                     "USER_CODE": user_cam.USER_CODE,
-#                     "CAM_CODE": user_cam.CAM_CODE,
-#                     "USER_CAM_CODE": user_cam.USER_CODE + str(user_cam.CAM_CODE)
-#                 }
-#
-#                 user_cam_create_result = user_crud.insertDB(engine, table=user_cam_table, data=user_cam_dict)
-#                 print("user_cam_insert : " + str(user_cam_create_result.get("res_code")))
-#                 if user_cam_create_result.get("res_code") != 200:
-#                     raise HTTPException(status_code=400, detail="UserCam insert failed")
-#         return {"res_code": 200}
-#     except HTTPException as he:
-#         # HTTPException은 이미 예외가 발생한 것으로 간주하고 처리
-#         print(f"HTTPException: {he}")
-#         raise
-#
-#     except Exception as e:
-#         # 모든 다른 예외에 대한 처리
-#         print(f"Error during transaction: {e}")
-#         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
 @user_router.post("/gigaeyes/users/", response_model=schemas.User)

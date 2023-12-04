@@ -12,35 +12,6 @@ import core.log as common
 log = common.logging.getLogger("api")
 
 
-
-
-# def insertDB(engine, table, data):
-#     user_dict = data.dict()
-#     table_name = table.__tablename__
-
-#     keys = user_dict.keys()
-#     column_names = ",".join(keys)
-#     placeholders = ",".join([f':{col}' for col in keys])
-
-#     if table_name.isupper():
-#         table_name = f'"{table_name}"'
-
-#     sql = f'INSERT INTO {table_name} ({column_names}) VALUES ({placeholders})'
-
-#     print(sql)
-#     print(user_dict)
-#     with engine.connect() as conn:
-#         trans = conn.begin()
-#         try:
-#             result = conn.execute(text(sql), user_dict)
-#             trans.commit()
-#             return {"res_code": 200}
-#         except Exception as e:
-#             trans.rollback()
-#             print(e)
-#             print("Insert DB Fail")
-#             return {"error": "Insert failed"}
-
 def insert(engine, table, data):
     user_dict = data
     if not isinstance(data, dict):
@@ -49,20 +20,11 @@ def insert(engine, table, data):
     table_name = table.__tablename__
 
     keys = user_dict.keys()
+    ## {user_id : "123", user_reg : Now() }
+    # user_id, user_reg
     column_names = ",".join([f'"{col}"' for col in keys])
     placeholders = ",".join([f':{col}' for col in keys])
     print(keys)
-
-    # sql = "SELECT * FROM users WHERE username = %s AND password = %s"
-    # conn.execute(sql, ('john', 'pass123'))
-
-    # sql = f'INSERT INTO {table_name} (CAM_CODE, MODEL_CODE, CAM_ID, CONN_TYPE) VALUES (:CAM_CODE, :MODEL_CODE, :CAM_ID, :CONN_TYPE)'
-    # result = conn.execute(text(sql), CAM_CODE=333, MODEL_CODE=1, CAM_ID='33', CONN_TYPE='N')
-
-    # [2023-11-01 16:23:26,140] [AnyIO worker thread] [DEBUG] INSERT INTO "VMS_CAM_INFO" ("CAM_CODE","MODEL_CODE","CAM_ID","CONN_TYPE")
-    #                                                         VALUES (:CAM_CODE,:MODEL_CODE,:CAM_ID,:CONN_TYPE)
-    # [2023-11-01 16:23:26,140] [AnyIO worker thread] [DEBUG] {'CAM_CODE': 33113, 'MODEL_CODE': 1, 'CAM_ID': '3113', 'CONN_TYPE': 'N'}
-
     if table_name.isupper():
         sql = f'INSERT INTO "{table_name}" ({column_names}) VALUES ({placeholders})'
     else:
@@ -97,16 +59,6 @@ def insert_user_cam_info(conn, table, data):
     placeholders = ",".join([f':{col}' for col in keys])
     print(keys)
 
-    # sql = "SELECT * FROM users WHERE username = %s AND password = %s"
-    # conn.execute(sql, ('john', 'pass123'))
-
-    # sql = f'INSERT INTO {table_name} (CAM_CODE, MODEL_CODE, CAM_ID, CONN_TYPE) VALUES (:CAM_CODE, :MODEL_CODE, :CAM_ID, :CONN_TYPE)'
-    # result = conn.execute(text(sql), CAM_CODE=333, MODEL_CODE=1, CAM_ID='33', CONN_TYPE='N')
-
-    # [2023-11-01 16:23:26,140] [AnyIO worker thread] [DEBUG] INSERT INTO "VMS_CAM_INFO" ("CAM_CODE","MODEL_CODE","CAM_ID","CONN_TYPE")
-    #                                                         VALUES (:CAM_CODE,:MODEL_CODE,:CAM_ID,:CONN_TYPE)
-    # [2023-11-01 16:23:26,140] [AnyIO worker thread] [DEBUG] {'CAM_CODE': 33113, 'MODEL_CODE': 1, 'CAM_ID': '3113', 'CONN_TYPE': 'N'}
-
     if table_name.isupper():
         sql = f'INSERT INTO "{table_name}" ({column_names}) VALUES ({placeholders})'
     else:
@@ -115,10 +67,7 @@ def insert_user_cam_info(conn, table, data):
     try:
 
         result = conn.execute(text(sql), user_dict)
-        # 쿼리문
-        # log.debug(sql)
-        # MAP
-        # log.debug(user_dict)
+
         log.info("insert result : %s", result)
         return {"res_code": 200, "msg": "DB INSERT SUCCESS"}
     except Exception as e:
@@ -159,7 +108,9 @@ def selectUserCodeDB(conn, table, user_code, cam_code):
         sql = text(f'select * from {table_name} where "USER_CODE" = :user_code and "CAM_CODE" = :cam_code')
 
     print(sql)
-    params = {"user_code": user_code, "cam_code": cam_code}
+    params = {
+        "user_code": user_code,
+        "cam_code": cam_code}
     try:
         result = conn.execute(sql, params)
         # data = [dict(row) for row in result.fetchall()]
@@ -189,8 +140,6 @@ def selectJson(engine, table, json_data):
         sql = f'select * from "{table_name}" where {where_clause}'
     else:
         sql = f'select * from {table_name} where {where_clause}'
-
-    # sql = f'select * from "{table_name}" where "USER_ID" = :USER_ID AND "USER_CODE" = :USER_CODE'
 
     try:
         with engine.connect() as conn:
@@ -253,73 +202,3 @@ def deleteUserCodeDB(engine, table, data):
     except Exception as e:
         print("Delete DB Fail", e)
         return JSONResponse(content={"error": "Deletion failed"})
-
-# def updateDB(table, data):
-#     user_dict = data.dict()
-#     keys = user_dict.keys()
-#     values = [user_dict[key] for key in keys]
-#     table_name = table.__tablename__
-
-#     primary_key_columns = [col.name for col in table.__table__.primary_key]
-
-#     non_primary_columns = [col for col in user_dict.keys() if col not in primary_key_columns]
-#     print(values)
-#     print(primary_key_columns)
-#     print(non_primary_columns)
-
-#     # set_clause = ", ".join([f'"{col}" = :{col}' for col in non_primary_columns])
-#     # where_clause = " AND ".join([f'"{col}" = :{col}' for col in primary_key_columns])
-#     set_clause = ", ".join([f'"{col}" = %s' for col in non_primary_columns])
-#     where_clause = " AND ".join([f'"{col}" = %s' for col in primary_key_columns])
-
-
-#     if table_name.isupper():
-#         sql = f'UPDATE "{table_name}" SET {set_clause} WHERE {where_clause}'
-#     else:
-#         sql = f'UPDATE {table_name} SET {set_clause} WHERE {where_clause}'
-
-#     conn = db.create_connection()
-#     cur = db.create_cursor(conn)
-
-#     print(sql)
-#     try:
-#         cur.execute(sql, values)
-
-#         db.commit(conn)
-
-#         return {"message": "Updated row(s)"}
-
-#     except Exception as e:
-#         print("Update DB Fail", e)
-#         return {"error": "Update failed"}
-
-#     finally:
-#         db.close_cursor(cur)
-#         db.close_connection(conn)
-
-# def create_user(db: Session, user: schemas.UserCreate):
-#     # db_user = models.Giga_user(USER_CODE=user.USER_CODE, USER_ID=user.USER_ID, REG_DATETIME = dt.datetime.now(), MOD_DATETIME = dt.datetime.now())
-
-#     # db.add(db_user)
-#     # db.commit()
-#     # db.refresh(db_user)
-
-#     sql = text('INSERT INTO "VMS_USER_INFO" ("USER_CODE", "USER_ID", "REG_DATETIME", "MOD_DATETIME") VALUES (:USER_CODE, :USER_ID, :REG_DATETIME, :MOD_DATETIME)')
-
-#     result = db.execute(sql, {
-#         "USER_CODE": user.USER_CODE,
-#         "USER_ID": user.USER_ID,
-#         "REG_DATETIME": dt.datetime.now(),
-#         "MOD_DATETIME": dt.datetime.now()
-#     })
-
-#     return result
-
-# def update_user(db: Session, user: schemas.UserUpdate):
-#     existing_user = db.query(models.Giga_user).filter(models.Giga_user.USER_CODE == user.USER_CODE).first()
-#     if existing_user:
-#         existing_user.DEL_FLAG = user.DEL_FLAG
-#         existing_user.MOD_DATETIME = dt.datetime.now()
-#         db.commit()
-#         db.refresh(existing_user)
-#     return existing_user
